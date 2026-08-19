@@ -214,6 +214,26 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
 }
 
 /**
+ * Mark the session-stats row under the composer (StatsLine, mounted in the
+ * `conversation.composer.dock` slot) so the skin can raise its contrast.
+ * The row is the InputBar root's last child after the composer card; the
+ * guard keeps a future non-stats footer from being decorated.
+ */
+function decorateStatsLine(decoratedElements: Set<HTMLElement>): void {
+  const seat = document.querySelector<HTMLElement>('[data-composer-seat]')
+  const card = seat?.querySelector<HTMLElement>('[data-composer-card]')
+  const barRoot = card?.parentElement
+  if (!barRoot) return
+  const footer = barRoot.lastElementChild
+  if (!(footer instanceof HTMLElement) || footer.hasAttribute('data-maid-stats-row')) return
+  // The stats line always carries pipe-separated groups; anything else that
+  // mounts in the dock slot must not be decorated.
+  if (footer.textContent === null || !footer.textContent.includes('|')) return
+  footer.dataset.maidStatsRow = ''
+  decoratedElements.add(footer)
+}
+
+/**
  * Apply the skin-owned background and independently retractable chrome.
  * @param ctx - owning context whose effect retracts every DOM and CSS write.
  */
@@ -264,6 +284,7 @@ export function apply(ctx: Context): void {
       delete element.dataset.maidSessionFlat
       delete element.dataset.maidSessionFirst
       delete element.dataset.maidSessionLast
+      delete element.dataset.maidStatsRow
     })
     if (themeColorMeta?.isConnected && themeColorMeta.content === SKIN_SYSTEM_CHROME_COLOR) {
       themeColorMeta.content = previousThemeColor ?? ''
@@ -450,6 +471,7 @@ export function apply(ctx: Context): void {
   decorateTitlebarBrand(ownedNodes)
   decorateSidebar(ownedNodes, decoratedElements)
   decorateWorkspaceTree(decoratedElements)
+  decorateStatsLine(decoratedElements)
   ensureSidebarObserved()
   const initialSidebar = document.querySelector<HTMLElement>(SIDEBAR_COLUMN_SELECTOR)
   if (initialSidebar) applySidebarWidth(initialSidebar.getBoundingClientRect().width)
@@ -465,6 +487,7 @@ export function apply(ctx: Context): void {
     decorateTitlebarBrand(ownedNodes)
     decorateSidebar(ownedNodes, decoratedElements)
     decorateWorkspaceTree(decoratedElements)
+    decorateStatsLine(decoratedElements)
     ensureSidebarObserved()
     const sidebar = document.querySelector<HTMLElement>(SIDEBAR_COLUMN_SELECTOR)
     if (sidebar === null) clearSidebarWidth()
@@ -527,7 +550,10 @@ export function apply(ctx: Context): void {
     if (sidebarStructureChanged) syncSidebarDecorations()
     else if (workspaceStateChanged) decorateWorkspaceTree(decoratedElements)
     if (backdropChanged) syncBackdrop()
-    if (composerChanged) syncComposerMotion()
+    if (composerChanged) {
+      syncComposerMotion()
+      decorateStatsLine(decoratedElements)
+    }
     if (settingsStateChanged) syncSettingsBackdropFrame()
   })
   observer.observe(body, {
